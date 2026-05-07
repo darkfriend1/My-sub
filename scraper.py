@@ -1,77 +1,66 @@
 import requests
 import re
 import base64
-import time
 
-# --- НАСТРОЙКИ ---
-TOTAL_GB = 67
-USED_GB = 42.0  # Будет отображаться 12,0GB / 500,0GB
-TG_NAME = "676767"
-
+# Источники, которые ты предоставил + твои старые
 SOURCES = [
     "https://raw.githubusercontent.com/yror382-netizen/Vpnchim/refs/heads/main/Sjsh",
     "https://gitverse.ru/api/repos/flaafix/AetrisVPN/raw/branch/master/AetrisVPN.txt",
-    "https://t.me/s/ConfigsHUB2",
     "https://t.me/s/halyava_vpnx",
-    "https://t.me/s/Farah_VPN",
-    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
-    "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/githubmirror/bypass-unsecure/bypass-unsecure-all.txt",
-    "https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full"
+    "https://t.me/s/Farah_VPN"
 ]
 
 def main():
-    # 1. ЗАГОЛОВОК ДЛЯ ШКАЛЫ (Формат как у Vpnchim/Aetris)
-    total_b = TOTAL_GB * 1024 * 1024 * 1024
-    used_b = int(USED_GB * 1024 * 1024 * 1024)
-    expire = int(time.time() + (86400 * 30)) # +30 дней
-    
-    header = f"subscription-userinfo: upload=0; download={used_b}; total={total_b}; expire={expire}\n"
-    header += f"profile-title: PHANTOM BYPASS\n"
-    header += f"support-url: https://t.me/{TG_NAME}\n"
-    header += f"profile-description: Переходите в телеграм канал @{TG_NAME} за обновлениями 🔝\n\n"
+    # 1. Заголовок (Без лимитов, как ты просил)
+    header = "profile-title: WWYOUVPN\n"
+    header += "profile-update-interval: 1\n"
+    header += "support-url: https://t.me/NOOOO\n\n"
 
-    # 2. СБОР КОНФИГОВ
+    # 2. Сбор сырых данных
     raw_content = ""
     for url in SOURCES:
         try:
-            r = requests.get(url, timeout=15)
-            if r.status_code == 200: raw_content += r.text + "\n"
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                raw_content += r.text + "\n"
         except: continue
 
-    # Мощная регулярка для захвата всей ссылки
-    pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]+'
+    # 3. Улучшенный поиск (фильтруем мусор, берем только полные ссылки)
+    # Ищем ссылки vless/vmess/ss/trojan длиной не менее 60 символов
+    pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]{60,}'
     found = re.findall(pattern, raw_content)
-    unique_nodes = list(set([n for n in found if len(n) > 40]))
+    unique_nodes = list(set(found))
     
-    # 3. АВТО-ОПРЕДЕЛЕНИЕ СТРАН И ФЛАГОВ
+    # 4. Форматирование под Fastcon: LTE | Country | Number
     final_list = []
-    for i, node in enumerate(unique_nodes[:150]):
+    for i, node in enumerate(unique_nodes[:100]):
         base_link = node.split('#')[0]
         n_up = node.upper()
         
-        # Логика флагов
-        if any(x in n_up for x in ["RU", "RUSSIA"]): flag, c = "🇷🇺", "Russia"
-        elif any(x in n_up for x in ["DE", "GERMANY"]): flag, c = "🇩🇪", "Germany"
-        elif any(x in n_up for x in ["US", "USA"]): flag, c = "🇺🇸", "USA"
-        elif any(x in n_up for x in ["NL", "NETHERLANDS"]): flag, c = "🇳🇱", "Netherlands"
-        elif any(x in n_up for x in ["TR", "TURKEY"]): flag, c = "🇹🇷", "Turkey"
-        else: flag, c = "🌐", "Bypass"
+        # Логика определения страны для флага
+        if any(x in n_up for x in ["RU", "RUSSIA"]): flag, country = "🇷🇺", "Russia"
+        elif any(x in n_up for x in ["DE", "GERMANY"]): flag, country = "🇩🇪", "Germany"
+        elif any(x in n_up for x in ["US", "USA"]): flag, country = "🇺🇸", "USA"
+        elif any(x in n_up for x in ["NL", "NETHERLANDS"]): flag, country = "🇳🇱", "Netherlands"
+        elif any(x in n_up for x in ["TR", "TURKEY"]): flag, country = "🇹🇷", "Turkey"
+        else: flag, country = "🌐", "Bypass"
 
-        name = f"{flag} LTE | {c} | {i+1}"
+        # Создаем имя как на фото 1000009207
+        name = f"LTE | {country} | {i+1}"
         final_list.append(f"{base_link}#{name}")
 
-    # 4. СОХРАНЕНИЕ
-    content = "\n".join(final_list)
+    # 5. Запись файлов
+    # configs.txt для тебя (открытый вид)
     with open("configs.txt", "w", encoding='utf-8') as f:
-        f.write(content)
+        f.write("\n".join(final_list))
     
-    # Base64 для Happ
-    payload = header + content
+    # sub.txt для Happ (Base64)
+    payload = header + "\n".join(final_list)
     encoded = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
     with open("sub.txt", "w", encoding='utf-8') as f:
         f.write(encoded)
 
-    print(f"Готово! Собрано {len(final_list)} конфигов.")
+    print(f"[+] Сгенерировано {len(final_list)} чистых конфигов.")
 
 if __name__ == "__main__":
     main()
