@@ -1,10 +1,11 @@
+# ИСПРАВЛЕННЫЙ .github/workflows/main.yml
+# Скопируй это и замени содержимое своего файла полностью!
 
-# .github/workflows/main.yml
 name: Update Subscription
 on:
   schedule:
-    - cron: '0 */3 * * *' # Обновление каждые 6 часов
-  workflow_dispatch: # Возможность ручного запуска
+    - cron: '0 */3 * * *' # Раз в 6 часов
+  workflow_dispatch: # Чтобы можно было запустить вручную
 
 jobs:
   build:
@@ -23,6 +24,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add sub.txt list.txt
+          # Мы добавляем только sub.txt, так как list.txt больше не нужен
+          git add sub.txt 
           git commit -m "Update nodes: $(date)" || exit 0
           git push
