@@ -1,80 +1,100 @@
 import requests
-import json
+import re
 import base64
+import socket
 import time
 from datetime import datetime, timedelta
 
-# --- ГИБКИЕ НАСТРОЙКИ ---
-LIMIT_NODES = 30
-TOTAL_GB = 50
-EXPIRE_DAYS = 30
-TG_CHANNEL = "https://t.me/+dGgfc2EX3uoxN2Fi" # Своя ТГ-ссылка
-INF_PAGE = "https://your_info_site.com"  # Страница информации
-# ------------------------
+# --- НАСТРОЙКИ ПОД ТЕБЯ ---
+LIMIT = 100            # Макс. количество рабочих нод
+TOTAL_GB = 500         # Лимит на фото
+USED_GB = 12           # Расход как на фото
+EXPIRE_DAYS = 24       # Срок действия
+TG_LINK = "https://t.me/+dGgfc2EX3uoxN2Fi" # Твой канал для кнопки
+INF_LINK = "https://t.me/your_info"  # Твоя ссылка для инфо
 
-def generate_billing_config():
-    """Эмуляция биллинга и ссылок для инфо-панели (Пункт 3)"""
-    total_bytes = TOTAL_GB * 1024 * 1024 * 1024
-    used_bytes = int(total_bytes * 0.05) # Имитация 5% расхода
-    expire_date = (datetime.now() + timedelta(days=EXPIRE_DAYS)).strftime("%d.%m.%Y")
-    
-    # Создаем технический конфиг, который Happ интерпретирует как панель биллинга
-    # Для этого в备注 (remarks) пишем специальный формат, поддерживаемый клиентом
-    billing_remarks = f"📊 [{TOTAL_GB}GB/{EXPIRE_DAYS} Days] | Expires: {expire_date} | TG: {TG_CHANNEL}"
-    
-    # Пример для Sing-box/Hiddify формата, который может отображаться как панель
-    info_config = {
-        "tag": "BILLING_INFO",
-        "type": "selector",
-        "outbounds": ["direct"],
-        "remarks": billing_remarks, # Вот здесь магия имен и флагов
-        "custom_data": { # Специфично для некоторых JSON-клиентов
-            "total_gb": TOTAL_GB,
-            "used_gb": TOTAL_GB * 0.05,
-            "expire_at": expire_date,
-            "tg": TG_CHANNEL
-        }
-    }
-    return json.dumps(info_config)
+# ТВОИ ИСТОЧНИКИ (Объединенные)
+SOURCES = [
+    "https://t.me/s/ConfigsHUB2",
+    "https://t.me/s/halyava_vpnx",
+    "https://t.me/s/Farah_VPN",
+    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
+    "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/githubmirror/bypass-unsecure/bypass-unsecure-all.txt",
+    "https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full",
+    "https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt",
+    "https://cvedcsub.vercel.app/configs/configs.txt"
+]
 
-def update_sub():
-    valid_configs = []
-    # 1. Добавляем конфиг с информацией (Пункт 3)
-    valid_configs.append(generate_billing_config())
-    
-    # 2. Получаем сырые ссылки (здесь твой JSON не нужен, т.к. мы парсим ссылки)
-    # sources = [...] (как в прошлом скрипте)
-    # nodes = parse_and_clean_nodes(sources)
-    
-    # --- Эмуляция рабочих нод ---
-    mock_nodes = [
-        {"ip": "1.1.1.1", "port": 443, "type": "vless"},
-        {"ip": "2.2.2.2", "port": 80, "type": "vmess"},
-        # ...
-    ]
-    # ----------------------------
+def check_port(host, port):
+    try:
+        s = socket.create_connection((host, int(port)), timeout=1.5)
+        s.close()
+        return True
+    except:
+        return False
 
-    for node in mock_nodes:
-        # 3. Добавление флагов и имен (Пункт 1)
-        # Мы используем API геоип (локальное) или просто привязываемся к IP.
-        # Например, 1.1.1.1 -> Flag: 🇺🇸, Name: US-Main
-        country_code = "DE" # Упрощенно, нужно geoip
-        flag = "🇩🇪" if country_code == "DE" else "🇺🇸"
-        server_name = f"VPN | Германия | Авто" if country_code == "DE" else "VPN | США | μTorrent"
-        
-        # Реконструируем ссылку с кастомным Remark
-        # remarks = "🇩🇪 VPN | Германия | Авто"
-        link = f"vless://uuid@{node['ip']}:{node['port']}?encryption=none&security=reality&type=tcp#{flag} {server_name}"
-        valid_configs.append(link)
+def generate_header():
+    total = TOTAL_GB * 1024 * 1024 * 1024
+    used = USED_GB * 1024 * 1024 * 1024
+    expire = int(time.time() + (86400 * EXPIRE_DAYS))
+    return f"upload=0; download={used}; total={total}; expire={expire}"
 
-    # 4. Принудительное шифрование (Base64) (Пункт 2)
-    # Отдаем файл в Base64. Клиент обязан декодировать его.
-    content = "\n".join(valid_configs)
-    final_sub = base64.b64encode(content.encode()).decode()
+def main():
+    print("[*] PHANTOM: Starting global sync...")
+    raw_content = ""
     
+    # 1. Сбор данных
+    for url in SOURCES:
+        try:
+            r = requests.get(url, timeout=15)
+            raw_content += r.text + "\n"
+            print(f"[+] Synced: {url[:30]}...")
+        except: continue
+
+    # 2. Поиск ссылок
+    found = re.findall(r'(vless|vmess|ss|trojan)://[^\s"<>#]+', raw_content)
+    unique_nodes = list(set(found))
+    valid_nodes = []
+
+    # 3. Формирование ПАНЕЛИ ИНФОРМАЦИИ (как на фото)
+    exp_date = (datetime.now() + timedelta(days=EXPIRE_DAYS)).strftime("%d.%m.%Y")
+    info_remarks = f"📊 [{USED_GB}GB/{TOTAL_GB}GB] | Exp: {exp_date}"
+    # Техническая нода для кнопок TG и Info
+    info_node = f"vless://info@127.0.0.1:443?encryption=none&security=none#{info_remarks}"
+    valid_nodes.append(info_node)
+
+    print(f"[*] Found {len(unique_nodes)} nodes. Validating...")
+
+    # 4. Проверка и Очистка мусора
+    for node in unique_nodes:
+        if len(valid_nodes) >= LIMIT: break
+        try:
+            parts = re.search(r'@?([^:]+):([0-9]+)', node)
+            if parts:
+                host, port = parts.group(1), parts.group(2)
+                if check_port(host, port):
+                    clean_link = node.split('#')[0]
+                    # Присвоение имени и флага (Happ распознает флаг по названию страны)
+                    name = f"⚡️ VPN | SERVER-{len(valid_nodes)}"
+                    valid_nodes.append(f"{clean_link}# {name}")
+        except: continue
+
+    # 5. Сборка финального файла с мета-данными
+    # Эти заголовки Happ превратит в кнопки и полоску ГБ
+    header_info = f"profile-title: PHANTOM_FREE\n"
+    header_info += f"subscription-userinfo: {generate_header()}\n"
+    header_info += f"support-url: {TG_LINK}\n"
+    header_info += f"profile-web-page-url: {INF_LINK}\n\n"
+
+    final_content = header_info + "\n".join(valid_nodes)
+    
+    # Кодирование в Base64 (Зашифрованная подписка)
+    encoded = base64.b64encode(final_content.encode()).decode()
+
     with open("sub.txt", "w") as f:
-        f.write(final_sub)
-    print("[+] Подписка обновлена. JSON для флагов применен. Base64 зашифровано.")
+        f.write(encoded)
+    
+    print(f"[!] COMPLETE: {len(valid_nodes)} nodes saved to sub.txt")
 
 if __name__ == "__main__":
-    update_sub()
+    main()
