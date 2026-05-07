@@ -4,9 +4,9 @@ import base64
 import time
 
 # --- НАСТРОЙКИ ---
-TOTAL_GB = 508
-USED_GB = 14
-TG_NAME = "serojka"
+TOTAL_GB = 506
+USED_GB = 17
+TG_NAME = "565666"
 
 SOURCES = [
     "https://t.me/s/ConfigsHUB2",
@@ -20,7 +20,7 @@ SOURCES = [
 ]
 
 def main():
-    # 1. Заголовки для Happ (Полоска 12/500 ГБ)
+    # 1. Заголовки для Happ
     total_b = TOTAL_GB * 1024 * 1024 * 1024
     used_b = USED_GB * 1024 * 1024 * 1024
     expire = int(time.time() + (86400 * 30))
@@ -30,39 +30,46 @@ def main():
     header += f"profile-title: My-Bypass-Sub\n"
     header += f"profile-description: Свежие конфиги для обхода блокировок @{TG_NAME} 🔝\n\n"
 
-    # 2. Сбор всех ссылок из твоих источников
+    # 2. Сбор контента
     raw_content = ""
     for url in SOURCES:
         try:
-            r = requests.get(url, timeout=10)
+            r = requests.get(url, timeout=15)
             raw_content += r.text + "\n"
         except: continue
 
-    # Ищем протоколы: vless, vmess, ss, trojan
-    found = re.findall(r'(vless|vmess|ss|trojan)://[^\s"<>#]+', raw_content)
-    nodes = list(set(found)) # Убираем дубликаты
+    # ИСПРАВЛЕННОЕ РЕГУЛЯРНОЕ ВЫРАЖЕНИЕ (берет ссылку целиком)
+    pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]+'
+    found = re.findall(pattern, raw_content)
     
-    # 3. Формируем список ссылок (с именами)
+    # Очистка от дублей и мусора
+    nodes = []
+    for n in found:
+        # Убираем лишние символы в конце, если прилипли
+        clean = n.split('<')[0].split('"')[1] if '"' in n else n.split('<')[0]
+        if len(clean) > 20: # Ссылка не может быть короче 20 символов
+            nodes.append(clean)
+    
+    unique_nodes = list(set(nodes))
+    
+    # 3. Формируем список
     final_list = []
-    for i, node in enumerate(nodes[:150]): # Оставляем топ-150
-        clean = node.split('#')[0]
-        # Сохраняем формат ссылки, который ты просил
-        final_list.append(f"{clean}#⚡️ Сервер {i+1}")
+    for i, node in enumerate(unique_nodes[:150]):
+        # Отрезаем старое имя, если оно было в ссылке
+        base_link = node.split('#')[0]
+        final_list.append(f"{base_link}#⚡️ Сервер {i+1}")
 
-    # 4. СОХРАНЯЕМ В ДВА ФАЙЛА
-    
-    # Файл №1: configs.txt (ОТКРЫТЫЕ ССЫЛКИ ДЛЯ ТЕБЯ)
+    # 4. Сохранение
     raw_text_output = "\n".join(final_list)
     with open("configs.txt", "w", encoding='utf-8') as f:
         f.write(raw_text_output)
     
-    # Файл №2: sub.txt (ЗАШИФРОВАННЫЙ ДЛЯ HAPP С ПОЛОСКОЙ ГБ)
     payload = header + raw_text_output
     encoded = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
     with open("sub.txt", "w", encoding='utf-8') as f:
         f.write(encoded)
 
-    print(f"Готово! В configs.txt и sub.txt сохранено {len(final_list)} конфигов.")
+    print(f"DONE! Найдено полноценных конфигов: {len(final_list)}")
 
 if __name__ == "__main__":
     main()
