@@ -2,7 +2,7 @@ import requests
 import re
 import base64
 
-# ТВОИ СТАРЫЕ ПРОВЕРЕННЫЕ ИСТОЧНИКИ (Без ТГ)
+# ТВОИ ПРОВЕРЕННЫЕ ИСТОЧНИКИ
 SOURCES = [
     "https://raw.githubusercontent.com/yror382-netizen/Vpnchim/refs/heads/main/Sjsh",
     "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
@@ -12,11 +12,6 @@ SOURCES = [
 ]
 
 def main():
-    # 1. Заголовок (Без лимитов, как на последних фото)
-    header = "profile-title: MY BYPASS\n"
-    header += "support-url: https://t.me/vbvbfdry\n\n"
-
-    # 2. Сбор данных
     raw_content = ""
     for url in SOURCES:
         try:
@@ -24,18 +19,17 @@ def main():
             if r.status_code == 200: raw_content += r.text + "\n"
         except: continue
 
-    # 3. Фильтр: только длинные рабочие ссылки (от 60 символов)
+    # Ищем только полноценные конфиги (длиннее 60 символов)
     pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]{60,}'
     found = re.findall(pattern, raw_content)
     unique_nodes = list(set(found))
     
-    # 4. Флаги и формат имен (LTE | Флаг Страна | №)
-    final_list = []
-    for i, node in enumerate(unique_nodes[:100]):
+    final_configs = []
+    for i, node in enumerate(unique_nodes[:150]):
         base_link = node.split('#')[0]
         n_up = node.upper()
         
-        # Определение страны
+        # Подбор флага как в твоих примерах
         if any(x in n_up for x in ["RU", "RUSSIA"]): flag, c = "🇷🇺", "Russia"
         elif any(x in n_up for x in ["DE", "GERMANY"]): flag, c = "🇩🇪", "Germany"
         elif any(x in n_up for x in ["NL", "NETHERLANDS"]): flag, c = "🇳🇱", "Netherlands"
@@ -43,21 +37,21 @@ def main():
         elif any(x in n_up for x in ["US", "USA"]): flag, c = "🇺🇸", "USA"
         else: flag, c = "🌐", "Bypass"
 
-        # Формат как на твоих фото-примерах
+        # Формат имени: LTE | Флаг Страна | Номер
         name = f"LTE | {flag} {c} | {i+1}"
-        final_list.append(f"{base_link}#{name}")
+        final_configs.append(f"{base_link}#{name}")
 
-    # 5. Сохранение
-    content = "\n".join(final_list)
+    # Сохраняем чистый список для отладки
+    output_text = "\n".join(final_configs)
     with open("configs.txt", "w", encoding='utf-8') as f:
-        f.write(content)
+        f.write(output_text)
     
-    payload = header + content
-    encoded = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
+    # Кодируем ВЕСЬ список в Base64 без лишних заголовков (как в твоем старом sub_base64.txt)
+    encoded = base64.b64encode(output_text.encode('utf-8')).decode('utf-8')
     with open("sub.txt", "w", encoding='utf-8') as f:
         f.write(encoded)
 
-    print(f"Готово! Собрано {len(final_list)} конфигов.")
+    print(f"[+] Собрано {len(final_configs)} конфигов.")
 
 if __name__ == "__main__":
     main()
