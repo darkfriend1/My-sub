@@ -25,6 +25,6 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           # Мы добавляем только sub.txt, так как list.txt больше не нужен
-          git add sub.txt 
+          git add sub.txt configs.txt
           git commit -m "Update nodes: $(date)" || exit 0
           git push
