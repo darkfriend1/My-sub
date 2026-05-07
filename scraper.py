@@ -4,7 +4,7 @@ import base64
 import time
 
 # --- НАСТРОЙКИ ---
-TOTAL_GB = 500
+TOTAL_GB = 234
 USED_GB = 5.6 # Можешь менять это число для теста шкалы
 TG_NAME = "14789"
 
