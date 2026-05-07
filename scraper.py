@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 
 # --- ГИБКИЕ НАСТРОЙКИ ---
 LIMIT_NODES = 30
-TOTAL_GB = 500
+TOTAL_GB = 50
 EXPIRE_DAYS = 30
-TG_CHANNEL = "https://t.me/PHANTOM_PROJECT" # Своя ТГ-ссылка
+TG_CHANNEL = "https://t.me/+dGgfc2EX3uoxN2Fi" # Своя ТГ-ссылка
 INF_PAGE = "https://your_info_site.com"  # Страница информации
 # ------------------------
 
