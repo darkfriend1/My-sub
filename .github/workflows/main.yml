@@ -1,1 +1,28 @@
 
+# .github/workflows/main.yml
+name: Update Subscription
+on:
+  schedule:
+    - cron: '0 */3 * * *' # Обновление каждые 6 часов
+  workflow_dispatch: # Возможность ручного запуска
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run Scraper
+        run: python scraper.py
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add sub.txt list.txt
+          git commit -m "Update nodes: $(date)" || exit 0
+          git push
