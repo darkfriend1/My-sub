@@ -1,30 +1,33 @@
-# ИСПРАВЛЕННЫЙ .github/workflows/main.yml
-# Скопируй это и замени содержимое своего файла полностью!
+name: VPN Parser Auto Update
 
-name: Update Subscription
 on:
   schedule:
-    - cron: '0 */3 * * *' # Раз в 6 часов
-  workflow_dispatch: # Чтобы можно было запустить вручную
+    - cron: "*/50 * * * *"   # каждые 30 минут
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.11"
+
       - name: Install dependencies
-        run: pip install requests
-      - name: Run Scraper
-        run: python scraper.py
-      - name: Commit and push changes
+        run: pip install -r requirements.txt
+
+      - name: Run parser
+        run: python app.py
+
+      - name: Commit results
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          # Мы добавляем только sub.txt, так как list.txt больше не нужен
-          git add sub.txt configs.txt
-          git commit -m "Update nodes: $(date)" || exit 0
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add output/
+          git commit -m "update configs" || exit 0
           git push
