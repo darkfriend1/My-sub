@@ -1,92 +1,65 @@
 import requests
 import re
 import base64
-import socket
-import urllib.parse
-import concurrent.futures
+import time
 
-# --- ТВОИ НАСТРОЙКИ ---
-MAX_SERVERS = 40  # Выбирай любое количество
-TIMEOUT = 3.0     # Глубина проверки (чем больше, тем точнее)
-
+# --- НАСТРОЙКИ ---
+MAX_SERVERS = 50 
+# Новые, супер-свежие источники
 SOURCES = [
     "https://raw.githubusercontent.com/yror382-netizen/Vpnchim/refs/heads/main/Sjsh",
-    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
-    "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/githubmirror/bypass-unsecure/bypass-unsecure-all.txt",
-    "https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full",
-    "https://gitverse.ru/api/repos/flaafix/AetrisVPN/raw/branch/master/AetrisVPN.txt"
+    "https://raw.githubusercontent.com/bikun-bikun/vless-daily/main/vless.txt",
+    "https://raw.githubusercontent.com/vfarid/v2ray-worker-sub/master/sub/shadowsocks",
+    "https://raw.githubusercontent.com/vfarid/v2ray-worker-sub/master/sub/vless",
+    "https://raw.githubusercontent.com/vfarid/v2ray-worker-sub/master/sub/vmess",
+    "https://raw.githubusercontent.com/vfarid/v2ray-worker-sub/master/sub/trojan"
 ]
 
-def deep_ping(node):
-    """ Улучшенная проверка: порт + готовность принять соединение """
-    try:
-        parsed = urllib.parse.urlparse(node)
-        netloc = parsed.netloc
-        if "@" in netloc: netloc = netloc.split("@")[1]
-        
-        host = netloc.split(":")[0]
-        # Чистим порт от лишних символов, которые могут прийти из грязных ссылок
-        port_raw = netloc.split(":")[1].split("?")[0].split("#")[0]
-        port = int(re.sub(r'\D', '', port_raw))
-        
-        # Первая стадия: Проверка DNS
-        ip = socket.gethostbyname(host)
-        
-        # Вторая стадия: Попытка установить TCP-соединение
-        with socket.create_connection((ip, port), timeout=TIMEOUT):
-            # Третья стадия (из старой версии): Проверка, что это не "заглушка"
-            # Мы просто проверяем, что сокет не закрывается мгновенно
-            return node
-    except:
-        return None
-
 def main():
-    raw_data = ""
+    raw_content = ""
     for url in SOURCES:
         try:
             r = requests.get(url, timeout=15)
-            if r.status_code == 200: raw_data += r.text + "\n"
+            if r.status_code == 200:
+                content = r.text
+                # Если источник в base64 — расшифровываем
+                if "://" not in content[:50]:
+                    try: content = base64.b64decode(content).decode('utf-8')
+                    except: pass
+                raw_content += content + "\n"
         except: continue
 
-    # Собираем только качественные ссылки (длинные)
-    pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]{65,}'
-    all_nodes = list(set(re.findall(pattern, raw_data)))
+    # Собираем ссылки (фильтруем только по длине, не пингуем — Happ сам проверит)
+    pattern = r'(?:vless|vmess|ss|trojan)://[a-zA-Z0-9\-\.\?@&\+=\|/%#:_]{50,}'
+    found = list(set(re.findall(pattern, raw_content)))
     
-    print(f"Найдено потенциальных серверов: {len(all_nodes)}. Начинаю проверку...")
-
-    # Параллельная проверка для скорости (как в старой версии)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-        checked_nodes = list(executor.map(deep_ping, all_nodes))
-    
-    # Оставляем только живых
-    alive_nodes = [n for n in checked_nodes if n is not None]
-    print(f"Живых серверов обнаружено: {len(alive_nodes)}")
-
     final_configs = []
-    for i, node in enumerate(alive_nodes[:MAX_SERVERS]):
-        base = node.split('#')[0].strip()
+    for i, node in enumerate(found[:MAX_SERVERS]):
+        base_link = node.split('#')[0].strip()
         n_up = node.upper()
         
-        # Подбор флага
-        if "RU" in n_up or "RUSSIA" in n_up: flag, c = "🇷🇺", "Russia"
-        elif "DE" in n_up or "GERMANY" in n_up: flag, c = "🇩🇪", "Germany"
-        elif "TR" in n_up or "TURKEY" in n_up: flag, c = "🇹🇷", "Turkey"
-        elif "NL" in n_up or "NETHERLANDS" in n_up: flag, c = "🇳🇱", "Netherlands"
+        # Определение флага
+        if any(x in n_up for x in ["RU", "RUSSIA"]): flag, c = "🇷🇺", "Russia"
+        elif any(x in n_up for x in ["DE", "GERMANY"]): flag, c = "🇩🇪", "Germany"
+        elif any(x in n_up for x in ["TR", "TURKEY"]): flag, c = "🇹🇷", "Turkey"
+        elif any(x in n_up for x in ["NL", "NETHERLANDS"]): flag, c = "🇳🇱", "Netherlands"
         else: flag, c = "🌐", "Bypass"
 
-        final_configs.append(f"{base}#LTE | {flag} {c} | {i+1}")
+        name = f"LTE | {flag} {c} | {i+1}"
+        final_configs.append(f"{base_link}#{name}")
 
-    # Сохраняем в файлы
-    content = "\n".join(final_configs)
-    with open("configs.txt", "w", encoding='utf-8') as f:
-        f.write(content)
+    output_text = "\n".join(final_configs)
     
-    # Важно: для Happ кодируем в чистый Base64 (как в твоем старом sub_base64.txt)
-    encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+    # Сохраняем configs.txt
+    with open("configs.txt", "w", encoding='utf-8') as f:
+        f.write(output_text)
+    
+    # Кодируем в чистый Base64 для Happ (как в старом проекте)
+    encoded = base64.b64encode(output_text.encode('utf-8')).decode('utf-8')
     with open("sub.txt", "w", encoding='utf-8') as f:
         f.write(encoded)
 
-    print(f"Файлы обновлены. Всего в списке: {len(final_configs)}")
+    print(f"Готово! Собрано {len(final_configs)} свежих конфигов.")
 
 if __name__ == "__main__":
     main()
