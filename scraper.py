@@ -1,248 +1,148 @@
 import requests
+import re
 import base64
-import json
 import socket
 import urllib.parse
 import concurrent.futures
-from pathlib import Path
 
 # =========================
-# SETTINGS
+# ⚙️ НАСТРОЙКИ
 # =========================
 
-CONFIG = {
-    "MAX_CONFIGS": 50,
-    "TIMEOUT": 3,
-    "MAX_WORKERS": 20,
+MAX_SERVERS = 49
+TIMEOUT = 3.0
 
-    # Разрешенные протоколы
-    "ALLOW_PROTOCOLS": [
-        "vmess",
-        "vless",
-        "trojan",
-        "ss"
-    ],
-
-    # Проверять DNS
-    "CHECK_DNS": True,
-
-    # Проверять порт
-    "CHECK_PORT": True,
-
-    # Удалять дубли
-    "REMOVE_DUPLICATES": True,
-
-    # Сохранять base64 подписку
-    "EXPORT_BASE64": True,
-
-    # Источники
-    "SOURCES": [
-        "https://example.com/configs.txt"
-    ]
-}
+SOURCES = [
+    "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt",
+    "https://raw.githubusercontent.com/whoahaow/rjsxrd/refs/heads/main/githubmirror/bypass-unsecure/bypass-unsecure-all.txt",
+    "https://raw.githubusercontent.com/Temnuk/naabuzil/refs/heads/main/whitelist_full",
+    "https://cvedcsub.vercel.app/configs/configs.txt",
+    "https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt"
+]
 
 # =========================
-# HELPERS
+# 📥 ЗАГРУЗКА
 # =========================
 
-def safe_request(url):
+def fetch_sources():
+    raw = ""
+    for url in SOURCES:
+        try:
+            r = requests.get(url, timeout=15)
+            if r.status_code == 200:
+                raw += r.text + "\n"
+        except:
+            pass
+    return raw
+
+# =========================
+# 🔍 ПАРСЕР
+# =========================
+
+def extract_nodes(raw):
+    pattern = r'(?:vless|vmess|ss|trojan)://[^\s]{20,}'
+    nodes = list(set(re.findall(pattern, raw)))
+    return nodes
+
+# =========================
+# ⚡ ПРОВЕРКА ЖИВЫХ
+# =========================
+
+def deep_ping(node):
     try:
-        r = requests.get(
-            url,
-            timeout=15,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            }
-        )
+        parsed = urllib.parse.urlparse(node)
+        netloc = parsed.netloc
 
-        if r.status_code != 200:
-            return ""
+        if "@" in netloc:
+            netloc = netloc.split("@")[1]
 
-        text = r.text.strip()
+        host = netloc.split(":")[0]
+        port = int(netloc.split(":")[1].split("?")[0])
 
-        # защита от html мусора
-        if "<html" in text.lower():
-            return ""
+        ip = socket.gethostbyname(host)
 
-        return text
-
-    except:
-        return ""
-
-# =========================
-# VMESS PARSER
-# =========================
-
-def parse_vmess(link):
-    try:
-        encoded = link.replace("vmess://", "").strip()
-
-        encoded += "=" * (-len(encoded) % 4)
-
-        decoded = base64.b64decode(encoded).decode("utf-8")
-
-        data = json.loads(decoded)
-
-        host = data.get("add")
-        port = int(data.get("port"))
-
-        return host, port
-
-    except:
-        return None, None
-
-# =========================
-# NORMAL PARSER
-# =========================
-
-def parse_uri(link):
-    try:
-        p = urllib.parse.urlparse(link)
-
-        return p.hostname, p.port
-
-    except:
-        return None, None
-
-# =========================
-# VALIDATION
-# =========================
-
-def validate_node(link):
-
-    try:
-
-        proto = link.split("://")[0]
-
-        if proto not in CONFIG["ALLOW_PROTOCOLS"]:
-            return None
-
-        # vmess
-        if proto == "vmess":
-            host, port = parse_vmess(link)
-
-        else:
-            host, port = parse_uri(link)
-
-        if not host or not port:
-            return None
-
-        # DNS
-        if CONFIG["CHECK_DNS"]:
-            socket.gethostbyname(host)
-
-        # PORT
-        if CONFIG["CHECK_PORT"]:
-            with socket.create_connection(
-                (host, port),
-                timeout=CONFIG["TIMEOUT"]
-            ):
-                pass
-
-        return link
-
+        with socket.create_connection((ip, port), timeout=TIMEOUT):
+            return node
     except:
         return None
 
 # =========================
-# LOAD SOURCES
+# 🌍 ОПРЕДЕЛЕНИЕ СТРАНЫ
 # =========================
 
-def load_sources():
+def get_tag(node):
+    up = node.upper()
 
-    raw = ""
-
-    for url in CONFIG["SOURCES"]:
-
-        print(f"[+] Loading: {url}")
-
-        raw += safe_request(url)
-        raw += "\n"
-
-    return raw
-
-# =========================
-# EXTRACT LINKS
-# =========================
-
-def extract_links(raw):
-
-    result = []
-
-    for line in raw.splitlines():
-
-        line = line.strip()
-
-        if not line:
-            continue
-
-        for proto in CONFIG["ALLOW_PROTOCOLS"]:
-
-            if line.startswith(f"{proto}://"):
-                result.append(line)
-
-    # remove duplicates
-    if CONFIG["REMOVE_DUPLICATES"]:
-        result = list(dict.fromkeys(result))
-
-    return result
+    if "RU" in up:
+        return "🇷🇺 Russia"
+    elif "DE" in up:
+        return "🇩🇪 Germany"
+    elif "NL" in up:
+        return "🇳🇱 Netherlands"
+    elif "US" in up:
+        return "🇺🇸 USA"
+    elif "TR" in up:
+        return "🇹🇷 Turkey"
+    else:
+        return "🌐 Global"
 
 # =========================
-# SAVE FILES
-# =========================
-
-def save_output(configs):
-
-    output = "\n".join(configs)
-
-    Path("configs.txt").write_text(
-        output,
-        encoding="utf-8"
-    )
-
-    print(f"[+] Saved configs.txt")
-
-    if CONFIG["EXPORT_BASE64"]:
-
-        encoded = base64.b64encode(
-            output.encode()
-        ).decode()
-
-        Path("sub.txt").write_text(
-            encoded,
-            encoding="utf-8"
-        )
-
-        print(f"[+] Saved sub.txt")
-
-# =========================
-# MAIN
+# 🚀 MAIN
 # =========================
 
 def main():
+    print("📡 Loading sources...")
 
-    raw = load_sources()
+    raw = fetch_sources()
+    nodes = extract_nodes(raw)
 
-    links = extract_links(raw)
+    print(f"🔎 Found: {len(nodes)} nodes")
 
-    print(f"[+] Found: {len(links)}")
+    print("⚡ Checking live servers...")
 
-    valid = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+        checked = list(ex.map(deep_ping, nodes))
 
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=CONFIG["MAX_WORKERS"]
-    ) as executor:
+    alive = [x for x in checked if x]
 
-        for result in executor.map(validate_node, links):
+    print(f"✅ Alive: {len(alive)}")
 
-            if result:
-                valid.append(result)
+    # =========================
+    # 🧹 CLEAN + FORMAT
+    # =========================
 
-    valid = valid[:CONFIG["MAX_CONFIGS"]]
+    final = []
 
-    print(f"[+] Valid: {len(valid)}")
+    for i, node in enumerate(alive[:MAX_SERVERS]):
+        base = node.split("#")[0].strip()
 
-    save_output(valid)
+        tag = get_tag(base)
+
+        final.append(f"{base}#VPN | {tag} | #{i+1}")
+
+    # =========================
+    # 💾 SAVE NORMAL
+    # =========================
+
+    text = "\n".join(final)
+
+    import os
+    os.makedirs("output", exist_ok=True)
+
+    with open("output/configs.txt", "w", encoding="utf-8") as f:
+        f.write(text)
+
+    # =========================
+    # 🔐 PREMIUM SUB (BASE64)
+    # =========================
+
+    encoded = base64.b64encode(text.encode("utf-8")).decode("utf-8")
+
+    with open("output/sub.txt", "w", encoding="utf-8") as f:
+        f.write(encoded)
+
+    print("📦 DONE")
+    print(f"📄 configs: {len(final)} servers")
 
 if __name__ == "__main__":
     main()
