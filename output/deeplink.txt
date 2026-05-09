@@ -1,0 +1,1 @@
+happ://install-sub?url=https%3A%2F%2Fraw.githubusercontent.com%2FUSER%2FREPO%2Fmain%2Foutput%2Fsub.txt
