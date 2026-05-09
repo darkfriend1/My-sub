@@ -1,8 +1,8 @@
-name: VPN Parser Auto Update
+name: VPN Parser Auto
 
 on:
   schedule:
-    - cron: "*/50 * * * *"   # каждые 30 минут
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,24 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install requests
+        run: pip install requests
 
       - name: Run parser
         run: python app.py
 
-      - name: Commit results
+      - name: Commit files
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
+
           git add output/
-          git commit -m "update configs" || exit 0
+
+          git commit -m "update sub" || exit 0
+
           git push
